@@ -19,7 +19,7 @@ public class World {
     private final ArrayList<Tile> tiles = new ArrayList<>();
 
     public void initialize() {
-        player = new Player(new Position(0, 0, 0));
+        player = new Player("Player", new Position(0, 0, 0));
         createNpcs();
     }
 
@@ -28,6 +28,17 @@ public class World {
         addNpc(new Npc("Rat", new Position(-2, 2, 0), 3));
         addNpc(new Npc("Bat", new Position(2, -2, 0), 3));
         addNpc(new Npc("Man", new Position(-2, -2, 0), 3));
+    }
+
+    public Tile getTileAt(float x, float y) {
+        for (Tile tile : tiles) {
+            if (tile.getPosition().getX() == (int) x &&
+                tile.getPosition().getY() == (int) y) {
+                return tile;
+            }
+        }
+
+        return null;
     }
 
     public Player getPlayer() {

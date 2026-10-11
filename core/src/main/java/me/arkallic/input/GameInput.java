@@ -101,35 +101,6 @@ public class GameInput implements InputProcessor {
         return cameraAngle;
     }
 
-    public void move(Player player, float speed, float runSpeed, float deltaTime) {
-        float movementSpeed = speed;
-
-        if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)) {
-            player.setRunning(true);
-            movementSpeed += runSpeed;
-        } else {
-            player.setRunning(false);
-        }
-
-        float movement = movementSpeed * deltaTime;
-
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) {
-            player.position().setY(player.position().getY() + movement);
-        }
-
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) {
-            player.position().setY(player.position().getY() - movement);
-        }
-
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) {
-            player.position().setX(player.position().getX() - movement);
-        }
-
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) {
-            player.position().setX(player.position().getX() + movement);
-        }
-    }
-
     @Override public boolean keyDown(int keycode) { return false; }
     @Override public boolean keyUp(int keycode) { return false; }
     @Override public boolean keyTyped(char character) { return false; }

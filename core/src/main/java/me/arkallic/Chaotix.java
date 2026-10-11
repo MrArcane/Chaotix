@@ -2,16 +2,21 @@ package me.arkallic;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.math.collision.Ray;
 import com.badlogic.gdx.utils.ScreenUtils;
 import me.arkallic.engine.GameLoop;
 import me.arkallic.entity.npc.Npc;
 import me.arkallic.entity.player.Player;
 import me.arkallic.input.GameInput;
 import me.arkallic.map.GameMap;
+import me.arkallic.map.TerrainRenderer;
 import me.arkallic.map.tile.Tile;
 import me.arkallic.world.World;
 
@@ -32,6 +37,9 @@ public class Chaotix extends ApplicationAdapter {
     private GameInput gameInput;
     private TextureAtlas atlas;
     private final HashMap<String, TextureRegion> textures = new HashMap<>();
+    private TerrainRenderer terrainRenderer;
+    private ShaderProgram transitionShader;
+    private ShaderProgram terrainShader;
 
 
     public void loadSprites() {
@@ -52,6 +60,7 @@ public class Chaotix extends ApplicationAdapter {
     public void create() {
         world = new World();
         gameMap = new GameMap(world);
+        gameMap.createMaps();
 
         loadSprites();
 
@@ -71,19 +80,60 @@ public class Chaotix extends ApplicationAdapter {
         batch = new SpriteBatch();
 
         gameLoop = new GameLoop(world.getPlayer(), world.getNpcs());
+        terrainRenderer = new TerrainRenderer(
+            gameMap.getHeights(),
+            gameMap.getTiles()
+        );
+        transitionShader = new ShaderProgram(
+            Gdx.files.internal("shaders/transition.vert"),
+            Gdx.files.internal("shaders/transition.frag")
+        );
+
+        if (!transitionShader.isCompiled()) {
+            Gdx.app.error(
+                "TransitionShader",
+                transitionShader.getLog()
+            );
+        }
+        terrainShader = new ShaderProgram(
+            Gdx.files.internal("shaders/terrain.vert"),
+            Gdx.files.internal("shaders/terrain.frag")
+        );
+
+        if (!terrainShader.isCompiled()) {
+            throw new RuntimeException(terrainShader.getLog());
+        }
+
+
     }
 
     @Override
     public void render() {
-        ScreenUtils.clear(0.15f, 0.15f, 0.2f, 1f);
+        Gdx.gl.glClearColor(0.15f, 0.15f, 0.2f, 1f);
+        Gdx.gl.glClear(
+            GL20.GL_COLOR_BUFFER_BIT |
+                GL20.GL_DEPTH_BUFFER_BIT
+        );
 
         gameLoop.update();
 
         handleCamera();
+        handleWorldClick();
 
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        drawMap();
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+        Gdx.gl.glDepthFunc(GL20.GL_LESS);
+
+        terrainShader.bind();
+
+        terrainShader.setUniformMatrix(
+            "u_projViewTrans",
+            camera.combined
+        );
+
+        terrainRenderer.render(terrainShader);
+
         drawNpcs();
         handleMovement();
         drawPlayer();
@@ -94,12 +144,13 @@ public class Chaotix extends ApplicationAdapter {
         shapeRenderer.dispose();
         batch.dispose();
         font.dispose();
+        if (transitionShader != null) {
+            transitionShader.dispose();
+        }
     }
 
     private void handleMovement() {
         float deltaTime = Gdx.graphics.getDeltaTime();
-
-        gameInput.move(player, 5f, 6f, deltaTime);
 
         float cameraAngle = gameInput.getCameraAngle();
         cameraAngle = gameInput.moveCamera(cameraAngle);
@@ -137,6 +188,32 @@ public class Chaotix extends ApplicationAdapter {
         camera.update();
     }
 
+    private void handleWorldClick() {
+        if (!Gdx.input.justTouched()) {
+            return;
+        }
+
+        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+            return;
+        }
+
+        Ray ray = camera.getPickRay(
+            Gdx.input.getX(),
+            Gdx.input.getY()
+        );
+
+        float distance = -ray.origin.z / ray.direction.z;
+
+        Vector3 worldPosition = new Vector3(ray.direction)
+            .scl(distance)
+            .add(ray.origin);
+
+        player.moveTo(
+            worldPosition.x / Tile.TILE_SIZE,
+            worldPosition.y / Tile.TILE_SIZE
+        );
+    }
+
     private void drawNpcs() {
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -145,7 +222,7 @@ public class Chaotix extends ApplicationAdapter {
             float x = npc.position().getX() * Tile.TILE_SIZE;
             float y = npc.position().getY() * Tile.TILE_SIZE;
            shapeRenderer.setColor(Color.GRAY);
-            shapeRenderer.box(x, y, 20, 32, 32, 40);
+            shapeRenderer.box(x, y, 20, 32, 32, 20);
         }
 
         shapeRenderer.end();
@@ -154,25 +231,38 @@ public class Chaotix extends ApplicationAdapter {
     private void drawPlayer() {
         float x = player.position().getX() * Tile.TILE_SIZE;
         float y = player.position().getY() * Tile.TILE_SIZE;
-        float z = player.position().getZ() * Tile.TILE_SIZE;
+
+        float worldX = player.position().getX() * Tile.TILE_SIZE;
+        float worldY = player.position().getY() * Tile.TILE_SIZE;
+
+        float z = terrainRenderer.getHeightAt(worldX, worldY);
+
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(Color.BLACK);
-        shapeRenderer.box(x, y, 20, 32, 32, 40);
+        shapeRenderer.box(x, y, z + 20, 32, 32, 40);
         shapeRenderer.end();
     }
-
     private void drawMap() {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
         for (Tile tile : world.getTiles()) {
+            float height = tile.getPosition().getZ() * 8f;
+            float thickness = 8f;
+            float x = tile.getPosition().getX() * Tile.TILE_SIZE;
+            float y = tile.getPosition().getY() * Tile.TILE_SIZE;
+
             shapeRenderer.setColor(tile.getTileType().color());
-            shapeRenderer.box(tile.getPosition().getX() * Tile.TILE_SIZE,
-                tile.getPosition().getY() * Tile.TILE_SIZE,
-                0,
+
+            shapeRenderer.box(
+                x,
+                y,
+                height - thickness / 2f,
                 Tile.TILE_SIZE,
                 Tile.TILE_SIZE,
-            1);
+                thickness
+            );
         }
+
         shapeRenderer.end();
     }
 }

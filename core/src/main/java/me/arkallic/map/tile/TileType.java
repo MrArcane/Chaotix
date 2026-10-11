@@ -4,40 +4,68 @@ import com.badlogic.gdx.graphics.Color;
 
 public enum TileType {
 
-    GRASS(new Color(0.25f, 0.55f, 0.20f, 1f)),
-    GRASS_DARK(new Color(0.18f, 0.42f, 0.15f, 1f)),
-    GRASS_LIGHT(new Color(0.35f, 0.65f, 0.25f, 1f)),
+    // Grass: natural greens with subtle variation
+    GRASS(Material.GRASS, new Color(0.30f, 0.52f, 0.22f, 1f)),
+    GRASS_DARK(Material.GRASS, new Color(0.24f, 0.43f, 0.18f, 1f)),
+    GRASS_LIGHT(Material.GRASS, new Color(0.37f, 0.59f, 0.27f, 1f)),
 
-    DIRT(new Color(0.45f, 0.32f, 0.18f, 1f)),
-    PATH(new Color(0.55f, 0.40f, 0.20f, 1f)),
-    PATH_DARK(new Color(0.40f, 0.28f, 0.14f, 1f)),
-    SAND(new Color(0.75f, 0.65f, 0.40f, 1f)),
+    // Earth: warm, earthy browns
+    DIRT(Material.DIRT, new Color(0.43f, 0.31f, 0.20f, 1f)),
+    PATH(Material.DIRT, new Color(0.53f, 0.39f, 0.25f, 1f)),
+    PATH_DARK(Material.DIRT, new Color(0.37f, 0.26f, 0.17f, 1f)),
+    SAND(Material.SAND, new Color(0.76f, 0.67f, 0.45f, 1f)),
 
-    STONE(new Color(0.45f, 0.45f, 0.45f, 1f)),
-    STONE_DARK(new Color(0.32f, 0.32f, 0.32f, 1f)),
-    STONE_LIGHT(new Color(0.60f, 0.60f, 0.60f, 1f)),
+    // Stone: muted gray with a slight warm tint
+    STONE(Material.STONE, new Color(0.48f, 0.47f, 0.44f, 1f)),
+    STONE_DARK(Material.STONE, new Color(0.36f, 0.36f, 0.34f, 1f)),
+    STONE_LIGHT(Material.STONE, new Color(0.62f, 0.61f, 0.57f, 1f)),
 
-    WATER(new Color(0.10f, 0.35f, 0.75f, 1f)),
-    WATER_DARK(new Color(0.05f, 0.22f, 0.55f, 1f)),
-    WATER_LIGHT(new Color(0.20f, 0.50f, 0.85f, 1f)),
+    // Water: deep blue with lighter variations
+    WATER(Material.WATER, new Color(0.12f, 0.34f, 0.62f, 1f)),
+    WATER_DARK(Material.WATER, new Color(0.08f, 0.25f, 0.47f, 1f)),
+    WATER_LIGHT(Material.WATER, new Color(0.20f, 0.44f, 0.70f, 1f)),
 
-    MUD(new Color(0.30f, 0.22f, 0.12f, 1f)),
-    SNOW(new Color(0.90f, 0.90f, 0.90f, 1f)),
-    ICE(new Color(0.65f, 0.85f, 0.95f, 1f)),
+    // Other terrain
+    MUD(Material.MUD, new Color(0.32f, 0.25f, 0.18f, 1f)),
+    SNOW(Material.SNOW, new Color(0.88f, 0.90f, 0.91f, 1f)),
+    ICE(Material.ICE, new Color(0.64f, 0.81f, 0.88f, 1f)),
 
-    WOOD(new Color(0.40f, 0.25f, 0.12f, 1f)),
-    BRIDGE(new Color(0.50f, 0.30f, 0.12f, 1f)),
+    // Wooden structures
+    WOOD(Material.WOOD, new Color(0.39f, 0.27f, 0.17f, 1f)),
+    BRIDGE(Material.WOOD, new Color(0.52f, 0.37f, 0.22f, 1f)),
 
-    COBBLESTONE(new Color(0.38f, 0.38f, 0.38f, 1f)),
-    MARBLE(new Color(0.75f, 0.75f, 0.70f, 1f)),
+    // Stone variations
+    COBBLESTONE(Material.STONE, new Color(0.42f, 0.41f, 0.39f, 1f)),
+    MARBLE(Material.STONE, new Color(0.77f, 0.75f, 0.69f, 1f)),
 
-    LAVA(new Color(0.85f, 0.20f, 0.05f, 1f)),
-    ASH(new Color(0.25f, 0.23f, 0.22f, 1f));
+    // Volcanic terrain
+    LAVA(Material.LAVA, new Color(0.90f, 0.25f, 0.07f, 1f)),
+    ASH(Material.ASH, new Color(0.29f, 0.27f, 0.25f, 1f));
 
+    public enum Material {
+        GRASS,
+        DIRT,
+        SAND,
+        STONE,
+        WATER,
+        MUD,
+        SNOW,
+        ICE,
+        WOOD,
+        LAVA,
+        ASH
+    }
+
+    private final Material material;
     private final Color color;
 
-    TileType(Color color) {
+    TileType(Material material, Color color) {
+        this.material = material;
         this.color = color;
+    }
+
+    public Material material() {
+        return material;
     }
 
     public Color color() {
