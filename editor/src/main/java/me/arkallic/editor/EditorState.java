@@ -19,6 +19,12 @@ final class EditorState {
     Tool tool = Tool.PAINT;
     int brush = 1;
 
+    /** Value the Height tool paints. */
+    float height = 1f;
+
+    /** Shade the grid by height, so you can see the terrain shape. */
+    boolean showHeights = false;
+
     EditorState(MapData map) {
         this.map = map;
     }

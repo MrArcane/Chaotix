@@ -5,7 +5,7 @@ import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 
 /**
  * Starts the editor window.
- * Optional argument: the size of a new map, e.g. 64 for 64x64 (default 32).
+ * Optional argument: the size of a new map, e.g. 64 for 64x64 (default 32, max 64).
  *   ./gradlew :editor:run --args="64"
  */
 public class EditorLauncher {
@@ -20,7 +20,7 @@ public class EditorLauncher {
                 return;
             }
         }
-        size = Math.max(1, Math.min(64, size));
+        size = Math.max(1, Math.min(MapFile.MAX_SIZE, size));
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Chaotix Map Editor");

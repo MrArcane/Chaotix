@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.graphics.g3d.model.Animation;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
@@ -19,6 +20,16 @@ import me.arkallic.map.GameMap;
 import me.arkallic.map.TerrainRenderer;
 import me.arkallic.map.tile.Tile;
 import me.arkallic.world.World;
+import net.mgsx.gltf.loaders.glb.GLBLoader;
+import net.mgsx.gltf.loaders.gltf.GLTFLoader;
+import net.mgsx.gltf.scene3d.scene.Scene;
+import net.mgsx.gltf.scene3d.scene.SceneAsset;
+import net.mgsx.gltf.scene3d.scene.SceneManager;
+import net.mgsx.gltf.scene3d.shaders.PBRShaderConfig;
+import net.mgsx.gltf.scene3d.shaders.PBRShaderProvider;
+import net.mgsx.gltf.scene3d.shaders.PBRDepthShaderProvider;
+import com.badlogic.gdx.graphics.g3d.shaders.DepthShader;
+
 
 import java.util.HashMap;
 
@@ -40,6 +51,11 @@ public class Chaotix extends ApplicationAdapter {
     private TerrainRenderer terrainRenderer;
     private ShaderProgram transitionShader;
     private ShaderProgram terrainShader;
+    private SceneAsset playerAsset;
+    private Scene playerScene;
+    private SceneManager sceneManager;
+    private String currentPlayerAnimation = "Idle_Loop";
+    private float playerRotation;
 
 
     public void loadSprites() {
@@ -69,7 +85,29 @@ public class Chaotix extends ApplicationAdapter {
             800,
             600
         );
+        playerAsset = new GLBLoader().load(
+            Gdx.files.internal("models/player.glb")
+        );
 
+        playerScene = new Scene(playerAsset.scene);
+        playerScene.animationController.setAnimation("Idle_Loop", -1);
+        PBRShaderConfig config = PBRShaderProvider.createDefaultConfig();
+        config.numBones = 65;
+        config.numDirectionalLights = 1;
+        config.numPointLights = 0;
+        config.numSpotLights = 0;
+
+        DepthShader.Config depthConfig = PBRShaderProvider.createDefaultDepthConfig();
+        depthConfig.numBones = 65;
+
+        sceneManager = new SceneManager(
+            new PBRShaderProvider(config),
+            new PBRDepthShaderProvider(depthConfig)
+        );
+
+        sceneManager.addScene(playerScene);
+        sceneManager.setCamera(camera);
+        sceneManager.setAmbientLight(1f);
         world.initialize();
 
         player = world.getPlayer();
@@ -116,10 +154,11 @@ public class Chaotix extends ApplicationAdapter {
         );
 
         gameLoop.update();
-
+        updatePlayerAnimation();
+        playerScene.animationController.update(Gdx.graphics.getDeltaTime());
         handleCamera();
         handleWorldClick();
-
+        playerScene.animationController.update(Gdx.graphics.getDeltaTime());
         shapeRenderer.setProjectionMatrix(camera.combined);
 
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
@@ -134,9 +173,9 @@ public class Chaotix extends ApplicationAdapter {
 
         terrainRenderer.render(terrainShader);
 
-        drawNpcs();
         handleMovement();
-        drawPlayer();
+        drawPlayerModel();
+        drawNpcs();
     }
 
     @Override
@@ -146,6 +185,26 @@ public class Chaotix extends ApplicationAdapter {
         font.dispose();
         if (transitionShader != null) {
             transitionShader.dispose();
+        }
+
+        if (sceneManager != null) {
+            sceneManager.dispose();
+        }
+
+        if (playerAsset != null) {
+            playerAsset.dispose();
+        }
+
+        if (terrainRenderer != null) {
+            terrainRenderer.dispose();
+        }
+
+        if (terrainShader != null) {
+            terrainShader.dispose();
+        }
+
+        if (atlas != null) {
+            atlas.dispose();
         }
     }
 
@@ -214,6 +273,22 @@ public class Chaotix extends ApplicationAdapter {
         );
     }
 
+    private void updatePlayerAnimation() {
+        String desiredAnimation;
+
+        if (!player.isMoving()) {
+            desiredAnimation = "Idle_Loop";
+        } else if (player.isRunning()) {
+            desiredAnimation = "Sprint_Loop";
+        } else {
+            desiredAnimation = "Walk_Loop";
+        }
+
+        if (!desiredAnimation.equals(currentPlayerAnimation)) {
+            playerScene.animationController.setAnimation(desiredAnimation, -1);
+            currentPlayerAnimation = desiredAnimation;
+        }
+    }
     private void drawNpcs() {
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -228,19 +303,28 @@ public class Chaotix extends ApplicationAdapter {
         shapeRenderer.end();
     }
 
-    private void drawPlayer() {
+    private void drawPlayerModel() {
         float x = player.position().getX() * Tile.TILE_SIZE;
         float y = player.position().getY() * Tile.TILE_SIZE;
+        float z = terrainRenderer.getHeightAt(x, y);
 
-        float worldX = player.position().getX() * Tile.TILE_SIZE;
-        float worldY = player.position().getY() * Tile.TILE_SIZE;
+        float dx = player.getTargetPosition().getX() - player.position().getX();
+        float dy = player.getTargetPosition().getY() - player.position().getY();
 
-        float z = terrainRenderer.getHeightAt(worldX, worldY);
+        if (dx * dx + dy * dy > 0.0001f) {
+            playerRotation = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees + 90f;
+        }
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(Color.BLACK);
-        shapeRenderer.box(x, y, z + 20, 32, 32, 40);
-        shapeRenderer.end();
+        playerScene.modelInstance.transform.idt();
+
+        playerScene.modelInstance.transform
+            .translate(x, y, z)
+            .rotate(Vector3.Z, playerRotation)
+            .rotate(Vector3.X, 90f)
+            .scale(20f, 20f, 20f);
+
+        sceneManager.update(Gdx.graphics.getDeltaTime());
+        sceneManager.render();
     }
     private void drawMap() {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);

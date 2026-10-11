@@ -11,8 +11,6 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import me.arkallic.map.MapData;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 
 /**
  * The editor application. It is only glue:
@@ -20,13 +18,13 @@ import java.io.Writer;
  *   EditorState  - what's selected + the MapData being edited
  *   GridView     - draws the map, turns mouse clicks into edits
  *   EditorUi     - the sidebar; asks us (the Listener) to clear/save/load
+ *   MapFile      - JSON in and out, using the same Json + MapData as the game
  * </pre>
- * Saving and loading go through MapFormat, the very same code the game uses,
- * so a file saved here is guaranteed to be readable by the game.
  */
 public class MapEditor extends ApplicationAdapter implements EditorUi.Listener {
 
     private static final String MAP_DIR = "maps/";
+    private static final String EXTENSION = ".json";
 
     private final int mapSize;
 
@@ -41,7 +39,7 @@ public class MapEditor extends ApplicationAdapter implements EditorUi.Listener {
 
     @Override
     public void create() {
-        state = new EditorState(new MapData());
+        state = new EditorState(MapOps.create("untitled", mapSize));
         stage = new Stage(new ScreenViewport());
         ui = new EditorUi(stage, state, this);
         grid = new GridView(stage, state);
@@ -76,8 +74,8 @@ public class MapEditor extends ApplicationAdapter implements EditorUi.Listener {
 
     @Override
     public void onClear() {
-        state.map.fill(MapData.DEFAULT_TILE);
-        ui.setStatus("Cleared. Every tile is " + MapData.DEFAULT_TILE.name() + " now.");
+        MapOps.clear(state.map);
+        ui.setStatus("Cleared. Every tile is " + MapOps.DEFAULT_TILE.name() + " and every height is 0.");
     }
 
     @Override
@@ -87,11 +85,15 @@ public class MapEditor extends ApplicationAdapter implements EditorUi.Listener {
             ui.setStatus("Type a file name first.");
             return;
         }
-        FileHandle file = Gdx.files.local(MAP_DIR + name + ".map");
-        state.map.setName(name);
-        try (Writer out = file.writer(false, "UTF-8")) {
-            MapFormat.write(state.map, out);
-            ui.setStatus("Saved " + file.path() + " (" + state.map.getWidth() + "x" + state.map.getHeight() + ")");
+        FileHandle file = Gdx.files.local(MAP_DIR + name + EXTENSION);
+        MapData map = state.map;
+        if ("untitled".equals(map.name)) {
+            map.name = name; // keep descriptive names you already gave a map; only name unnamed ones
+        }
+        try {
+            // Build the whole text first, so a failure can't leave a half-written file.
+            file.writeString(MapFile.toJson(map), false, "UTF-8");
+            ui.setStatus("Saved " + file.path() + " (" + map.width + "x" + map.height + ")");
         } catch (IOException | GdxRuntimeException e) {
             ui.setStatus("Save failed: " + e.getMessage());
         }
@@ -104,14 +106,14 @@ public class MapEditor extends ApplicationAdapter implements EditorUi.Listener {
             ui.setStatus("Type the name of a map to load.");
             return;
         }
-        FileHandle file = Gdx.files.local(MAP_DIR + name + ".map");
+        FileHandle file = Gdx.files.local(MAP_DIR + name + EXTENSION);
         if (!file.exists()) {
             ui.setStatus("No such file: " + file.path());
             return;
         }
-        try (Reader in = file.reader("UTF-8")) {
-            state.map = MapFormat.read(in); // only replaced if the whole file parsed fine
-            ui.setStatus("Loaded " + file.path() + " (" + state.map.getWidth() + "x" + state.map.getHeight() + ")");
+        try {
+            state.map = MapFile.parse(file.readString("UTF-8")); // only replaced if the whole file is valid
+            ui.setStatus("Loaded " + file.path() + " (" + state.map.width + "x" + state.map.height + ")");
         } catch (IOException | GdxRuntimeException e) {
             ui.setStatus("Load failed: " + e.getMessage());
         }

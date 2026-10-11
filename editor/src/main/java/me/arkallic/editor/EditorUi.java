@@ -50,6 +50,7 @@ final class EditorUi implements Disposable {
     private final TextButton.TextButtonStyle toggleStyle;
     private final Table sidebar = new Table();
     private final TextField nameField;
+    private final TextField heightField;
     private final Label status;
     private final Label hover;
 
@@ -73,11 +74,12 @@ final class EditorUi implements Disposable {
         sidebar.top().left().pad(10);
 
         // ---- Tool ----
-        addHeading("TOOL (left-click)");
+        addHeading("TOOL   (left-click applies, right-click erases)");
         ButtonGroup<TextButton> tools = new ButtonGroup<>();
         Table toolRow = new Table();
-        toolRow.add(toggle("Paint", tools, () -> state.tool = Tool.PAINT)).width(100).height(28).padRight(6);
-        toolRow.add(toggle("Fill", tools, () -> state.tool = Tool.FILL)).width(100).height(28);
+        toolRow.add(toggle("Paint", tools, () -> state.tool = Tool.PAINT)).width(98).height(28).padRight(6);
+        toolRow.add(toggle("Fill", tools, () -> state.tool = Tool.FILL)).width(98).height(28).padRight(6);
+        toolRow.add(toggle("Height", tools, () -> state.tool = Tool.HEIGHT)).width(98).height(28);
         sidebar.add(toolRow).left().row();
 
         // ---- Brush ----
@@ -89,6 +91,35 @@ final class EditorUi implements Disposable {
         }
         sidebar.add(brushRow).left().row();
 
+        // ---- Height: the value the Height tool paints, and a shaded view of the terrain ----
+        addHeading("HEIGHT   (value for the Height tool)");
+        heightField = new TextField(format(state.height), skin);
+        heightField.setMaxLength(8);
+        heightField.setTextFieldFilter((field, c) -> Character.isDigit(c) || c == '.' || c == '-');
+        heightField.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                try {
+                    state.height = Float.parseFloat(heightField.getText());
+                } catch (NumberFormatException e) {
+                    // half-typed, like "-" or ".": keep the last good value
+                }
+            }
+        });
+        final TextButton showHeights = new TextButton("Show heights", toggleStyle);
+        showHeights.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                state.showHeights = showHeights.isChecked();
+            }
+        });
+        Table heightRow = new Table();
+        heightRow.add(heightField).width(80).height(28).padRight(6);
+        heightRow.add(action("-", () -> nudgeHeight(state, -0.25f))).width(40).height(28).padRight(6);
+        heightRow.add(action("+", () -> nudgeHeight(state, 0.25f))).width(40).height(28).padRight(6);
+        heightRow.add(showHeights).width(120).height(28);
+        sidebar.add(heightRow).left().row();
+
         // ---- Palette: one swatch + one toggle button per TileType, two per row ----
         addHeading("TILE");
         ButtonGroup<TextButton> palette = new ButtonGroup<>();
@@ -97,7 +128,7 @@ final class EditorUi implements Disposable {
         for (int i = 0; i < types.length; i++) {
             final TileType type = types[i];
             paletteTable.add(new Image(white.tint(type.color()))).size(18).padRight(4);
-            paletteTable.add(toggle(type.name(), palette, () -> state.tile = type)).width(126).height(24).padBottom(2).padRight(i % 2 == 0 ? 10 : 0);
+            paletteTable.add(toggle(type.name(), palette, () -> state.tile = type)).width(126).height(22).padBottom(1).padRight(i % 2 == 0 ? 10 : 0);
             if (i % 2 == 1) {
                 paletteTable.row();
             }
@@ -105,7 +136,7 @@ final class EditorUi implements Disposable {
         sidebar.add(paletteTable).left().row();
 
         // ---- Files ----
-        addHeading("MAP FILE  (assets/maps/<name>.map)");
+        addHeading("MAP FILE   (assets/maps/<name>.json)");
         nameField = new TextField("my_map", skin);
         nameField.setMaxLength(32);
         nameField.setTextFieldFilter((field, c) -> Character.isLetterOrDigit(c) || c == '_' || c == '-');
@@ -126,10 +157,6 @@ final class EditorUi implements Disposable {
         hover.setColor(HEADING);
         sidebar.add(hover).left().padTop(4).row();
 
-        Label help = new Label("Left-click: paint   Right-click: erase", skin);
-        help.setColor(HEADING);
-        sidebar.add(help).left().padTop(4).row();
-
         // Show the initial selection (must match what EditorState starts with).
         tools.setChecked("Paint");
         brushes.setChecked("1x1");
@@ -142,6 +169,15 @@ final class EditorUi implements Disposable {
     void layout(float stageHeight) {
         sidebar.setBounds(0, 0, WIDTH, stageHeight);
         sidebar.invalidate();
+    }
+
+    private void nudgeHeight(EditorState state, float delta) {
+        state.height = Math.round((state.height + delta) * 100f) / 100f;
+        heightField.setText(format(state.height));
+    }
+
+    private static String format(float value) {
+        return Float.toString(Math.round(value * 100f) / 100f);
     }
 
     void setStatus(String text) {
@@ -159,7 +195,7 @@ final class EditorUi implements Disposable {
     private void addHeading(String text) {
         Label label = new Label(text, skin);
         label.setColor(HEADING);
-        sidebar.add(label).left().padTop(10).padBottom(3).row();
+        sidebar.add(label).left().padTop(6).padBottom(3).row();
     }
 
     /** A button that stays pressed. Buttons sharing a group act like radio buttons. */

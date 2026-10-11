@@ -60,6 +60,12 @@ public class Player implements Entity {
         return running;
     }
 
+    public boolean isMoving() {
+        float dx = targetPosition.getX() - position.getX();
+        float dy = targetPosition.getY() - position.getY();
+
+        return dx * dx + dy * dy > 0.0001f;
+    }
     public void setRunning(boolean running) {
         this.running = running;
     }
