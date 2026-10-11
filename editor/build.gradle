@@ -1,0 +1,35 @@
+// Chaotix Map Editor: a separate desktop app.
+// It depends on :core (for TileType, MapData, MapFormat) but the game never depends on it.
+
+plugins {
+  id "application"
+}
+
+application.mainClass = 'me.arkallic.editor.EditorLauncher'
+application.applicationName = 'ChaotixMapEditor'
+eclipse.project.name = appName + '-editor'
+
+java.sourceCompatibility = 8
+java.targetCompatibility = 8
+if (JavaVersion.current().isJava9Compatible()) {
+  compileJava.options.release.set(8)
+}
+
+dependencies {
+  implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
+  implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+  implementation project(':core')
+}
+
+def os = System.properties['os.name'].toLowerCase(Locale.ROOT)
+
+run {
+  // Same working directory as the game, so "maps/xyz.map" means assets/maps/xyz.map
+  // for both the editor (saving) and the game (loading).
+  workingDir = rootProject.file('assets').path
+
+  // Same JVM flags the game's lwjgl3 module uses for newer JDKs.
+  jvmArgs += "--enable-native-access=ALL-UNNAMED"
+  jvmArgs += "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED"
+  if (os.contains('mac')) jvmArgs += "-XstartOnFirstThread"
+}
